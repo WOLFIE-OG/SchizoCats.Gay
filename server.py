@@ -3,7 +3,6 @@ import uuid
 import asyncio
 import datetime
 from typing import List
-import platform
 import hashlib
 import json
 import signal
@@ -361,18 +360,12 @@ app.include_router(front_end)
 
 if __name__ == "__main__":
     event = get_event_loop_policy().get_event_loop()
-    if platform.system() == "Windows":
-        server = Server(config=Config(app=app, host="127.0.0.1", port=2095))
-
-    else:
-        server = Server(
-            config=Config(
-                app=app,
-                host="0.0.0.0",
-                port=2095,
-                ssl_certfile="/ssl/cats/cats.pem",
-                ssl_keyfile="/ssl/cats/private.key",
-            )
+    server = Server(
+        config=Config(
+            app=app,
+            host="0.0.0.0",
+            port=2095,
         )
+    )
     event.create_task(server.serve())
     event.run_forever()

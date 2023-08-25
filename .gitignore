@@ -163,3 +163,5 @@ CatServerENV/
 CatDB.schizo
 init-env.sh
 own_script.js
+web/content/*
+.vscode
