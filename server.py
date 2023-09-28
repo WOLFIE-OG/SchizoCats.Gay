@@ -8,6 +8,7 @@ import json
 import signal
 import sys
 import logging
+import re
 from asyncio import get_event_loop_policy
 from aiohttp import ClientSession
 import aiosqlite
@@ -23,6 +24,7 @@ from fastapi.middleware import Middleware
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 from uvicorn import Config, Server
+from libs.utils import Utils
 
 BASE_URL = "https://schizocats.gay"
 WEB_URL = f"{BASE_URL}/web"
@@ -84,7 +86,7 @@ def receive_signal(signalNumber: int, *args, **kwargs):
     Args:
         signalNumber (int): _description_
     """
-    app.logger.warning(f"Received: {signalNumber}")
+    print(f"Received: {signalNumber}")
     sys.exit()
 
 
@@ -146,8 +148,8 @@ class FrontEnd:
 
 @cbv(base_router)
 class BaseCat:
-    @base_router.get("/api/upload/tiktok")
-    async def upload_tiktok(self, request: Request, url: str):
+    @base_router.get("/api/upload/external")
+    async def upload_external_site(self, request: Request, url: str):
         """_summary_
 
         Args:
@@ -157,101 +159,83 @@ class BaseCat:
         Returns:
             _type_: _description_
         """
+        
         async with ClientSession() as session:
-            proc = await asyncio.create_subprocess_shell(
-                f"yt-dlp {url} --dump-json",
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-            )
-            stdout, stderr = await proc.communicate()
-            if len(stdout) != 0:
-                data = json.loads(stdout)
-                tiktok_url = next(
-                    (
-                        _format.get("url")
-                        for _format in data.get("formats")
-                        if _format.get("format_note") == "Direct video (API)"
-                    ),
-                    None,
-                )
-                if tiktok_url is not None:
-                    async with session.get(
-                        tiktok_url,
-                        headers={
-                            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.93 Safari/537.36",
-                            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-                            "Accept-Language": "en-us,en;q=0.5",
-                            "Sec-Fetch-Mode": "navigate",
-                        },
-                    ) as req:
-                        file = await req.read()
-                        file_id = f"CAT_{str(uuid.uuid4())}"
-                        hash = hashlib.sha256(file).hexdigest()
-                        cursor = await app.database.cursor()
-                        res = await cursor.execute(
-                            f"SELECT FileHash FROM Media WHERE FileHash='{hash}'"
-                        )
-                        if len(await res.fetchall()) > 0:
-                            return JSONResponse(
-                                content={
-                                    "upload_type": "tiktok",
-                                    "msg": "File is already uploaded.",
-                                },
-                                status_code=403,
-                            )
-
-                        with open(
-                            pathlib.Path(f"web/content/{file_id}.mp4"),
-                            "wb",
-                        ) as _file:
-                            _file.write(file)
-
-                        ip = request.headers.get("cf-connecting-ip")
-                        origin = request.headers.get("cf-ipcountry")
-                        query = (
-                            Query.into(Table("Media"))
-                            .columns(
-                                "FileID",
-                                "FileHash",
-                                "Extension",
-                                "OriginalFileName",
-                                "Size",
-                                "ContentType",
-                                "UploadDate",
-                                "IP",
-                                "Origin",
-                            )
-                            .insert(
-                                file_id,
-                                hash,
-                                "mp4",
-                                "TIKTOK_DOWNLOADED",
-                                len(file),
-                                "video/mp4",
-                                int(datetime.datetime.now().timestamp()),
-                                ip,
-                                origin,
-                            )
-                        )
-
-                        await cursor.execute(str(query))
-                        await app.database.commit()
-                        await cursor.close()
+            headers, url = await Utils.get_url(url)
+            if url:
+                async with session.get(
+                    url,
+                    headers=headers,
+                ) as req:
+                    file = await req.read()
+                    file_id = f"CAT_{str(uuid.uuid4())}"
+                    hash = hashlib.sha256(file).hexdigest()
+                    cursor = await app.database.cursor()
+                    res = await cursor.execute(
+                        f"SELECT FileHash FROM Media WHERE FileHash='{hash}'"
+                    )
+                    if len(await res.fetchall()) > 0:
                         return JSONResponse(
                             content={
-                                "upload_type": "tiktok",
-                                "msg": "Uploaded video from tiktok.",
+                                "upload_type": "EXTERNAL_VIDEO",
+                                "msg": "File is already uploaded.",
                             },
-                            status_code=200,
+                            status_code=403,
                         )
-                else:
+
+                    with open(
+                        pathlib.Path(f"web/content/{file_id}.mp4"),
+                        "wb",
+                    ) as _file:
+                        _file.write(file)
+
+                    ip = request.headers.get("cf-connecting-ip")
+                    origin = request.headers.get("cf-ipcountry")
+                    
+                    query = (
+                        Query.into(Table("Media"))
+                        .columns(
+                            "FileID",
+                            "FileHash",
+                            "Extension",
+                            "OriginalFileName",
+                            "Size",
+                            "ContentType",
+                            "UploadDate",
+                            "IP",
+                            "Origin",
+                        )
+                        .insert(
+                            file_id,
+                            hash,
+                            "mp4",
+                            "EXTERNAL_DOWNLOAD",
+                            len(file),
+                            "video/mp4",
+                            int(datetime.datetime.now().timestamp()),
+                            ip,
+                            origin,
+                        )
+                    )
+
+                    await cursor.execute(str(query))
+                    await app.database.commit()
+                    await cursor.close()
                     return JSONResponse(
                         content={
-                            "upload_type": "tiktok",
-                            "msg": "Couldn't find tiktok raw URL.",
+                            "upload_type": "external",
+                            "msg": "Uploaded video from external site.",
                         },
-                        status_code=403,
+                        status_code=200,
                     )
+            else:
+                return JSONResponse(
+                    content={
+                        "upload_type": "external",
+                        "msg": "Couldn't find raw URL or the url is invalid.",
+                    },
+                    status_code=403,
+                )
     @base_router.post("/api/upload")
     async def upload_file(self, request: Request, files: List[UploadFile]):
         """_summary_
