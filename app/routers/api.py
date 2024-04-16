@@ -28,14 +28,28 @@ class API:
             _type_: _description_
         """
 
-        async with ClientSession() as session:
-            headers, url = await get_url(url)
+        headers, url = await get_url(url)
+        async with ClientSession(headers=headers) as session:
             if url:
                 async with session.get(
                     url,
-                    headers=headers,
                 ) as req:
                     file = await req.read()
+                    if req.content_type not in [
+                        "video/mp4",
+                        "video/mpeg",
+                        "video/webm",
+                        "video/x-msvideo",
+                        "video/ogg",
+                        "video/quicktime",
+                    ]:
+                        return JSONResponse(
+                            content={
+                                "upload_type": "external",
+                                "msg": "Something went wrong...",
+                            },
+                            status_code=403,
+                        )
                     file_id = f"CAT_{str(uuid.uuid4())}"
                     hash = hashlib.sha256(file).hexdigest()
                     cursor = await request.app.database.cursor()
@@ -206,13 +220,10 @@ class API:
         """
         file_id, ext = await get_random_video(request.app.database)
         return JSONResponse(content={"file_id": file_id, "ext": ext}, status_code=200)
-    
+
     @api_router.get("/api/get_count")
     async def fetch_count(self, request: Request):
         cursor = await request.app.database.cursor()
-        res = await cursor.execute(
-            f"SELECT COUNT(*) FROM Media"
-        )
+        res = await cursor.execute(f"SELECT COUNT(*) FROM Media")
         res = await res.fetchone()
         return JSONResponse(content={"count": res[0]}, status_code=200)
-

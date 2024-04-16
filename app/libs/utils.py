@@ -5,6 +5,7 @@ import json
 import logging
 from colorama import Fore, init
 from fastapi import FastAPI
+from http.cookies import SimpleCookie
 
 
 @staticmethod
@@ -28,31 +29,24 @@ async def get_url(url: str):
     ):
         return False, False
 
-    data = await process(f"yt-dlp {url} --dump-json --cookies cookies.txt")
+    data = await process(f"yt-dlp {url} --dump-json")
 
     if data[1]:
         data = json.loads(bytes(data[1]).decode("utf-8"))
     match data.get("webpage_url_domain"):
-        case "tiktok.com":
-            media_url = next(
-                (
-                    _format.get("url")
-                    for _format in data.get("formats")
-                    if _format.get("format_note") == "Direct video (API)"
-                ),
-                None,
+        case "youtube.com" | "youtu.be" | "twitter.com" | "x.com" | "tiktok.com":
+            media_url = await process(
+                f"yt-dlp {url} --get-url -f b --cookies cookies.txt"
             )
 
-        case "youtube.com" | "youtu.be" | "twitter.com" | "x.com":
-            media_url = await process(f"yt-dlp {url} --get-url -f b --cookies cookies.txt")
-        
         case _:
             media_url = await process(
                 f"yt-dlp {url} --get-url -f b --cookies cookies.txt"
             )
 
     headers = data.get("http_headers")
-    return headers, bytes(media_url[1]).decode("utf-8") if media_url[1] else False
+    headers["Cookie:"] = data.get("cookies")
+    return headers, media_url[1].decode("utf-8")
 
 
 @staticmethod
