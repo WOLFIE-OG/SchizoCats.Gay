@@ -32,8 +32,8 @@
 				<div class="collapse navbar-collapse" id="navbarNav">
 					<ul class="navbar-nav">
 						<li class="nav-item">
-							<a class="nav-link active" aria-current="page" href="javascript:ChangeToHome()">Home</a>
-							<a class="nav-link" aria-current="page" href="javascript:ChangeToUpload()">Upload</a>
+							<a class="nav-link active" aria-current="page" href="javascript:changeToHome()">Home</a>
+							<a class="nav-link" aria-current="page" href="javascript:changeToUpload()">Upload</a>
 						</li>
 					</ul>
 				</div>
@@ -114,6 +114,17 @@
 					<button type="button" id="upload_files" class="btn btn-secondary btn-lg">Upload</button>
 				</div>
 			</div>
+			<br>
+			<div class="container">
+				<div class="d-grid gap-2 col-5 mx-auto">
+					<div class="input-group mb-3">
+						<div class="input-group-prepend">
+							<button class="btn btn-secondary" id="upload_input" type="button">Upload</button>
+						</div>
+						<input type="text" id="upload_input_text" class="form-control" placeholder="URL" aria-label="" aria-describedby="basic-addon1">
+					</div>
+				</div>
+			</div>
 		</section>
 		<footer>
 			<hr>
@@ -124,6 +135,7 @@
 							<div>
 								<p>
 								<div class="btn-shine">Site made by <a href="https://twitter.com/WOLFIE_OG" target="_blank">WOLFIE_OG</a> <img src="web/image/WOLFIE_LOGO.png" width="30px" height="30px" class="rounded" alt="WOLFIE_OG"></div>
+								<div class="btn-shine">Current video count: <span id="video_count">-</span></div>
 								</p>
 							</div>
 						</div>
