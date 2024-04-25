@@ -13,7 +13,6 @@ from ..libs import get_url, get_random_video
 
 api_router = InferringRouter()
 
-
 @cbv(api_router)
 class API:
     @api_router.get("/api/upload/external")
@@ -29,10 +28,11 @@ class API:
         """
 
         headers, url = await get_url(url)
-        async with ClientSession(headers=headers) as session:
+        async with ClientSession() as session:
             if url:
                 async with session.get(
                     url,
+                    headers=headers
                 ) as req:
                     file = await req.read()
                     if req.content_type not in [

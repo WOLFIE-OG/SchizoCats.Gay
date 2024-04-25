@@ -5,7 +5,6 @@ import json
 import logging
 from colorama import Fore, init
 from fastapi import FastAPI
-from http.cookies import SimpleCookie
 
 
 @staticmethod
@@ -33,19 +32,45 @@ async def get_url(url: str):
 
     if data[1]:
         data = json.loads(bytes(data[1]).decode("utf-8"))
+    headers = data.get("http_headers")
+    media_url = url.encode("utf-8")
     match data.get("webpage_url_domain"):
-        case "youtube.com" | "youtu.be" | "twitter.com" | "x.com" | "tiktok.com":
+        case "tiktok.com":
+            source = next(
+                (
+                    _format
+                    for _format in data.get("formats")
+                    if _format.get("format_id") == "0"
+                ),
+                next(
+                    (
+                        _format
+                        for _format in data.get("formats")
+                        if _format.get("format_id") == "download"
+                    ),
+                    None,
+                ),
+            )
+            cookies = []
+            for i in source["cookies"].split(";"):
+                c = i.split("=", 1)
+                if c[0].strip() in ["ttwid", "tt_csrf_token", "tt_chain_token"]:
+                    key = c[0]
+                    value = c[1].replace('"', "")
+                    cookies.append(f"{key}={value};")
+            headers["Cookie"] = "".join(cookies)
+            media_url = [0, str(source.get("url")).encode("utf-8")]
+        
+        case "youtube.com" | "youtu.be" | "twitter.com" | "x.com":
             media_url = await process(
                 f"yt-dlp {url} --get-url -f b --cookies cookies.txt"
             )
+            headers["Cookie"] = data.get("cookies")
 
         case _:
             media_url = await process(
                 f"yt-dlp {url} --get-url -f b --cookies cookies.txt"
             )
-
-    headers = data.get("http_headers")
-    headers["Cookie:"] = data.get("cookies")
     return headers, media_url[1].decode("utf-8")
 
 
