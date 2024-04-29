@@ -65,7 +65,6 @@ async def get_url(url: str):
             media_url = await process(
                 f"yt-dlp {url} --get-url -f b --cookies cookies.txt"
             )
-            headers["Cookie"] = data.get("cookies")
 
         case _:
             media_url = await process(
