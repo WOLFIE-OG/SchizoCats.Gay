@@ -9,12 +9,25 @@ from fastapi import Request, UploadFile
 from fastapi.responses import JSONResponse
 from fastapi_utils.cbv import cbv
 from fastapi_utils.inferring_router import InferringRouter
-from ..libs import get_url, get_random_video
+from ..libs import (
+    get_url,
+    get_random_video,
+    update_view_count,
+    get_video_by_id,
+    check_content_length,
+)
 
 api_router = InferringRouter()
 
+
 @cbv(api_router)
 class API:
+    """_summary_
+
+    Returns:
+        _type_: _description_
+    """
+
     @api_router.get("/api/upload/external")
     async def upload_external_site(self, request: Request, url: str):
         """_summary_
@@ -30,10 +43,15 @@ class API:
         headers, url = await get_url(url)
         async with ClientSession() as session:
             if url:
-                async with session.get(
-                    url,
-                    headers=headers
-                ) as req:
+                if not await check_content_length(url):
+                    return JSONResponse(
+                        content={
+                            "upload_type": "external",
+                            "msg": "Files more than 50 MB are not upload-able!",
+                        },
+                        status_code=403,
+                    )
+                async with session.get(url, headers=headers) as req:
                     file = await req.read()
                     if req.content_type not in [
                         "video/mp4",
@@ -46,7 +64,7 @@ class API:
                         return JSONResponse(
                             content={
                                 "upload_type": "external",
-                                "msg": "Something went wrong...",
+                                "msg": "File type is not supported",
                             },
                             status_code=403,
                         )
@@ -54,13 +72,13 @@ class API:
                     hash = hashlib.sha256(file).hexdigest()
                     cursor = await request.app.database.cursor()
                     res = await cursor.execute(
-                        f"SELECT COUNT(*) FROM Media WHERE FileHash='{hash}'"
+                        f"SELECT COUNT(*) FROM Content WHERE FileHash='{hash}'"
                     )
                     res = await res.fetchone()
                     if res[0]:
                         return JSONResponse(
                             content={
-                                "upload_type": "EXTERNAL_VIDEO",
+                                "upload_type": "external",
                                 "msg": "File is already uploaded.",
                             },
                             status_code=403,
@@ -76,7 +94,7 @@ class API:
                     origin = request.headers.get("cf-ipcountry")
 
                     query = (
-                        Query.into(Table("Media"))
+                        Query.into(Table("Content"))
                         .columns(
                             "FileID",
                             "FileHash",
@@ -87,6 +105,7 @@ class API:
                             "UploadDate",
                             "IP",
                             "Origin",
+                            "ViewCount",
                         )
                         .insert(
                             file_id,
@@ -98,6 +117,7 @@ class API:
                             int(datetime.datetime.now().timestamp()),
                             ip,
                             origin,
+                            0,
                         )
                     )
 
@@ -132,10 +152,12 @@ class API:
             _type_: _description_
         """
         total = len(files)
-        successfull = 0
+        successful = 0
         for media in files:
             file_id = f"CAT_{str(uuid.uuid4())}"
             raw = await media.read()
+            if len(raw) > (50 * 1024 * 1024):
+                continue
             match media.content_type:
                 case "video/mp4":
                     ext = "mp4"
@@ -161,7 +183,7 @@ class API:
             hash = hashlib.sha256(raw).hexdigest()
             cursor = await request.app.database.cursor()
             res = await cursor.execute(
-                f"SELECT COUNT(*) FROM Media WHERE FileHash='{hash}'"
+                f"SELECT COUNT(*) FROM Content WHERE FileHash='{hash}'"
             )
             res = await res.fetchone()
             if res[0]:
@@ -173,7 +195,7 @@ class API:
             ip = request.headers.get("cf-connecting-ip")
             origin = request.headers.get("cf-ipcountry")
             query = (
-                Query.into(Table("Media"))
+                Query.into(Table("Content"))
                 .columns(
                     "FileID",
                     "FileHash",
@@ -184,6 +206,7 @@ class API:
                     "UploadDate",
                     "IP",
                     "Origin",
+                    "ViewCount",
                 )
                 .insert(
                     file_id,
@@ -195,21 +218,23 @@ class API:
                     int(datetime.datetime.now().timestamp()),
                     ip,
                     origin,
+                    0,
                 )
             )
 
             await cursor.execute(str(query))
             await request.app.database.commit()
             await cursor.close()
-            successfull += 1
+            successful += 1
 
         return JSONResponse(
-            content={"upload_type": "file", "successfull": successfull, "total": total},
+            content={"upload_type": "file", "successful": successful, "total": total},
             status_code=200,
         )
 
     @api_router.get("/api/get_cat")
-    async def fetch_cat(self, request: Request):
+    @api_router.get("/api/get_cat/{c_id}")
+    async def fetch_cat(self, request: Request, c_id: str = None):
         """_summary_
 
         Args:
@@ -218,12 +243,26 @@ class API:
         Returns:
             _type_: _description_
         """
-        file_id, ext = await get_random_video(request.app.database)
-        return JSONResponse(content={"file_id": file_id, "ext": ext}, status_code=200)
+        if not c_id:
+            file_id, ext, views = await get_random_video(request.app.database)
+        else:
+            file_id, ext, views = await get_video_by_id(request.app.database, c_id)
+        views = await update_view_count(request.app.database, file_id)
+        return JSONResponse(
+            content={"file_id": file_id, "ext": ext, "views": views}, status_code=200
+        )
 
     @api_router.get("/api/get_count")
     async def fetch_count(self, request: Request):
+        """_summary_
+
+        Args:
+            request (Request): _description_
+
+        Returns:
+            _type_: _description_
+        """
         cursor = await request.app.database.cursor()
-        res = await cursor.execute(f"SELECT COUNT(*) FROM Media")
+        res = await cursor.execute(f"SELECT COUNT(*) FROM Content")
         res = await res.fetchone()
         return JSONResponse(content={"count": res[0]}, status_code=200)

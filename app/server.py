@@ -1,12 +1,14 @@
 import signal
 import aiosqlite
+import re
+from pypika import Table, Query
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.middleware import Middleware
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
-from .libs import setup_logging, signal_handler
+from .libs import setup_logging, signal_handler, update_view_count
 from .routers import api_router, front_router
 
 middleware = [
@@ -33,7 +35,21 @@ async def start_up():
     signal.signal(signal.SIGINT, signal_handler)
     db_con = await aiosqlite.connect("CatDB.schizo")
     await db_con.execute(
-        "CREATE TABLE IF NOT EXISTS Media (ID INTEGER PRIMARY KEY AUTOINCREMENT, FileID, FileHash, Extension, OriginalFileName, Size, ContentType, UploadDate, IP, Origin)"
+        """
+            CREATE TABLE IF NOT EXISTS Content (
+                ID INTEGER PRIMARY KEY AUTOINCREMENT,
+                FileID TEXT,
+                FileHash TEXT,
+                Extension TEXT,
+                OriginalFileName TEXT,
+                Size INTEGER,
+                ContentType TEXT,
+                UploadDate INTEGER,
+                IP TEXT,
+                Origin TEXT,
+                ViewCount INTEGER DEFAULT 0
+            );
+        """
     )
     app.__setattr__("database", db_con)
 
@@ -51,6 +67,13 @@ async def log_request(request: Request, call_next):
     """
     response: Request = await call_next(request)
     response.headers["server"] = "Cats"
+    # v = re.search(
+    #     r"\/web\/content\/(CAT_[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})\.mp4|mpeg|webm|avi|ogg|mov",
+    #     request.url.path,
+    # )
+    # if v:
+    #     c_id = v.group(1)
+    #     await update_view_count(request.app.database, c_id)
     return response
 
 

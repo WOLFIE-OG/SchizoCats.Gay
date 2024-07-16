@@ -14,12 +14,11 @@
 		<title>Schizo Cats Official - Home</title>
 		<meta name="theme-color" content="#F3969A">
 		<meta property="og:type" content="video">
-		<meta property="og:url" content="https://schizocats.wolfieog.xyz">
-		<meta property="og:video:url" content="https://schizocats.wolfieog.xyz/web/content/{{ random_file }}"/>
-		<meta property="og:video:type" content="video/mp4"/>
+		<meta property="og:url" content="{{ base_url }}">
 		<meta property="og:title" content="Schizo Cats Official">
-		<meta property="og:description"  content="Meow Meow Meow I Love Cats!!!1"/>
-		<meta property="og:site_name" content="Schizo Cats Official">
+		<meta property="og:site_name" content="Video View Count: {{ view_count }}">
+		<meta property="og:video:url" content="{{ base_url }}/web/content/{{ random_file }}"/>
+		<meta property="og:video:type" content="video/mp4"/>
 	</head>
 	<body>
 		<script src="web/js/oneko.min.js"></script>
@@ -42,8 +41,9 @@
 		<section class="py-2 py-lg-5 text-light" id="main_section">
 			<div class="container">
 				<div class="videoplayer" id="cat_player">
+					<h3>View Count: <span id="cat_view_count">{{ view_count }}</span></h3>
 					<div class="ratio ratio-16x9 bg-dark border border-1 border-primary rounded" id="cat_player_nearly">
-						<video class="video col-sm-4 text-center" width="50%" height="50%" id="cat_player_actual" src="" controls></video>
+						<video class="video col-sm-4 text-center" width="50%" height="50%" id="cat_player_actual" src="/web/content/{{ random_file }}" controls data-file-id="{{ file_id }}"></video>
 					</div>
 					<div style="display: none;" class="ratio" id="loading_animation">
 						<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" style="margin:auto;display:block;" width="490px" height="490px" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid">
@@ -91,9 +91,10 @@
 		</section>
 		<section class="py-2 py-lg-5 text-light" id="main_section_buttons">
 			<div class="container">
-				<div class="d-grid gap-2 col-5 mx-auto">
-					<button type="button" id="next_cat_video" class="btn btn-secondary btn-lg">Random Video</button>
-					<button type="button" id="copy_cat_url" class="btn btn-secondary btn-lg">Copy Video URL</button>
+				<div class="d-grid gap-4 col-6 col-md-4 mx-auto text-center">
+					<button type="button" id="next_cat_video" class="btn btn-secondary btn-lg w-100 mb-3">Random Video</button>
+					<button type="button" id="copy_cat_url" class="btn btn-secondary btn-lg w-100 mb-3">Copy Video URL</button>
+					<button type="button" id="copy_direct_cat_url" class="btn btn-secondary btn-lg w-100 mb-3">Copy Direct Video URL</button>
 				</div>
 			</div>
 		</section>
@@ -108,18 +109,17 @@
 				</div>
 			</div>
 		</section>
-		<section class="py-2 py-lg-5 text-light" id="upload_section_buttons" hidden>
+		<section id="upload_section_buttons" class="py-2 py-lg-5 text-light" hidden>
 			<div class="container">
-				<div class="d-grid gap-2 col-5 mx-auto">
-					<button type="button" id="upload_files" class="btn btn-secondary btn-lg">Upload</button>
+				<div class="d-grid gap-4 col-5 col-md-4 mx-auto text-center">
+					<button type="button" id="upload_files" class="btn btn-secondary btn-lg w-100 mb-3">Upload</button>
 				</div>
 			</div>
-			<br>
 			<div class="container">
-				<div class="d-grid gap-2 col-5 mx-auto">
+				<div class="d-grid gap-2 col-4 mx-auto">
 					<div class="input-group mb-3">
 						<div class="input-group-prepend">
-							<button class="btn btn-secondary" id="upload_input" type="button">Upload</button>
+							<button id="upload_input" type="button" class="btn btn-secondary">Upload</button>
 						</div>
 						<input type="text" id="upload_input_text" class="form-control" placeholder="URL" aria-label="" aria-describedby="basic-addon1">
 					</div>
